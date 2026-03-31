@@ -802,7 +802,207 @@ function showToast(message) {
 // (Task 4 adds example datasets here)
 
 // === MATH ENGINE ===
-// (Task 2 adds math functions here)
+
+/**
+ * Normal CDF - Abramowitz & Stegun 26.2.17
+ * P(Z <= x) for standard normal
+ * Max error: 7.5e-8
+ */
+function normalCDF(x) {
+  if (x === 0) return 0.5;
+  const a1 = 0.254829592;
+  const a2 = -0.284496736;
+  const a3 = 1.421413741;
+  const a4 = -1.453152027;
+  const a5 = 1.061405429;
+  const p = 0.3275911;
+
+  const sign = x < 0 ? -1 : 1;
+  const absX = Math.abs(x);
+  const t = 1.0 / (1.0 + p * absX);
+  const t2 = t * t;
+  const t3 = t2 * t;
+  const t4 = t3 * t;
+  const t5 = t4 * t;
+  const y = 1.0 - (a1 * t + a2 * t2 + a3 * t3 + a4 * t4 + a5 * t5) * Math.exp(-absX * absX / 2);
+
+  return 0.5 * (1.0 + sign * y);
+}
+
+/**
+ * Normal quantile (inverse CDF) - Beasley-Springer-Moro algorithm
+ * Given p in (0,1), returns z such that P(Z <= z) = p
+ */
+function normalQuantile(p) {
+  if (p <= 0) return -Infinity;
+  if (p >= 1) return Infinity;
+  if (p === 0.5) return 0;
+
+  // Rational approximation for central region
+  const a = [
+    -3.969683028665376e+01,  2.209460984245205e+02,
+    -2.759285104469687e+02,  1.383577518672690e+02,
+    -3.066479806614716e+01,  2.506628277459239e+00
+  ];
+  const b = [
+    -5.447609879822406e+01,  1.615858368580409e+02,
+    -1.556989798598866e+02,  6.680131188771972e+01,
+    -1.328068155288572e+01
+  ];
+  const c = [
+    -7.784894002430293e-03, -3.223964580411365e-01,
+    -2.400758277161838e+00, -2.549732539343734e+00,
+     4.374664141464968e+00,  2.938163982698783e+00
+  ];
+  const d = [
+     7.784695709041462e-03,  3.224671290700398e-01,
+     2.445134137142996e+00,  3.754408661907416e+00
+  ];
+
+  const pLow = 0.02425;
+  const pHigh = 1 - pLow;
+  let q, r;
+
+  if (p < pLow) {
+    // Lower tail
+    q = Math.sqrt(-2 * Math.log(p));
+    return (((((c[0]*q + c[1])*q + c[2])*q + c[3])*q + c[4])*q + c[5]) /
+           ((((d[0]*q + d[1])*q + d[2])*q + d[3])*q + 1);
+  } else if (p <= pHigh) {
+    // Central region
+    q = p - 0.5;
+    r = q * q;
+    return (((((a[0]*r + a[1])*r + a[2])*r + a[3])*r + a[4])*r + a[5]) * q /
+           (((((b[0]*r + b[1])*r + b[2])*r + b[3])*r + b[4])*r + 1);
+  } else {
+    // Upper tail
+    q = Math.sqrt(-2 * Math.log(1 - p));
+    return -(((((c[0]*q + c[1])*q + c[2])*q + c[3])*q + c[4])*q + c[5]) /
+             ((((d[0]*q + d[1])*q + d[2])*q + d[3])*q + 1);
+  }
+}
+
+/**
+ * Compute Required Information Size (RIS) in total participants.
+ *
+ * @param {object} params
+ *   Binary: { type:'binary', measure:'OR'|'RR'|'RD',
+ *             anticipatedEffect, controlRate, alpha, power }
+ *   Continuous: { type:'continuous', measure:'MD'|'SMD',
+ *                 anticipatedEffect, sigma (for MD) or 1 (for SMD),
+ *                 alpha, power }
+ * @returns {number} RIS (total participants, both arms combined)
+ */
+function sampleSizeRIS(params) {
+  const alpha = params.alpha ?? 0.05;
+  const power = params.power ?? 0.80;
+  const zAlpha = normalQuantile(1 - alpha / 2);
+  const zBeta = normalQuantile(power);
+  const zSum = zAlpha + zBeta;
+
+  if (params.type === 'binary') {
+    const pC = params.controlRate;
+    const effect = params.anticipatedEffect;
+
+    if (params.measure === 'RD') {
+      // Risk Difference
+      const pE = pC + effect;
+      // Pooled variance approach
+      const pBar = (pC + pE) / 2;
+      return Math.ceil(4 * zSum * zSum * pBar * (1 - pBar) / (effect * effect));
+    } else if (params.measure === 'RR') {
+      // Relative Risk (log scale)
+      const logRR = Math.log(Math.abs(effect));
+      if (logRR === 0) return Infinity;
+      return Math.ceil(4 * zSum * zSum / (logRR * logRR));
+    } else {
+      // OR (log scale)
+      const logOR = Math.log(Math.abs(effect));
+      if (logOR === 0) return Infinity;
+      return Math.ceil(4 * zSum * zSum / (logOR * logOR));
+    }
+  } else {
+    // Continuous: MD or SMD
+    const delta = params.anticipatedEffect;
+    const sigma = params.sigma ?? 1;
+    if (delta === 0) return Infinity;
+    return Math.ceil(2 * zSum * zSum * sigma * sigma / (delta * delta));
+  }
+}
+
+/**
+ * Compute diversity D^2 from heterogeneity I^2.
+ * D^2 = I^2 / (1 - I^2) when I^2 < 1, else cap at large value.
+ * @param {number} i2 - I-squared in [0, 1)
+ * @returns {number} D-squared (diversity)
+ */
+function diversityAdjust(i2) {
+  if (i2 == null || i2 < 0) return 0;
+  if (i2 >= 1) return 100; // cap to avoid Infinity
+  return i2 / (1 - i2);
+}
+
+/**
+ * Alpha-spending function.
+ * Maps information fraction t in [0,1] to cumulative alpha spent.
+ *
+ * Types:
+ *   'obrien-fleming' : 2 - 2*Phi(z_{alpha/2} / sqrt(t))
+ *   'pocock'         : alpha * ln(1 + (e-1)*t)
+ *   'lan-demets-of'  : same as O'Brien-Fleming
+ *   'lan-demets-pocock' : same as Pocock
+ *
+ * @param {number} t - information fraction in [0, 1]
+ * @param {string} type - spending function type
+ * @param {number} alpha - overall alpha level
+ * @returns {number} cumulative alpha spent at fraction t
+ */
+function alphaSpending(t, type, alpha) {
+  if (t <= 0) return 0;
+  if (t >= 1) return alpha;
+  alpha = alpha ?? 0.05;
+
+  const zAlphaHalf = normalQuantile(1 - alpha / 2);
+
+  switch (type) {
+    case 'obrien-fleming':
+    case 'lan-demets-of':
+      return 2 - 2 * normalCDF(zAlphaHalf / Math.sqrt(t));
+    case 'pocock':
+    case 'lan-demets-pocock':
+      return alpha * Math.log(1 + (Math.E - 1) * t);
+    default:
+      return alpha * t; // linear (fallback)
+  }
+}
+
+/**
+ * Beta-spending function.
+ * Same functional forms as alpha-spending, but for type II error.
+ *
+ * @param {number} t - information fraction in [0, 1]
+ * @param {string} type - spending function type
+ * @param {number} beta - overall beta level (1 - power)
+ * @returns {number} cumulative beta spent at fraction t
+ */
+function betaSpending(t, type, beta) {
+  if (t <= 0) return 0;
+  if (t >= 1) return beta;
+  beta = beta ?? 0.20;
+
+  const zBetaHalf = normalQuantile(1 - beta / 2);
+
+  switch (type) {
+    case 'obrien-fleming':
+    case 'lan-demets-of':
+      return 2 - 2 * normalCDF(zBetaHalf / Math.sqrt(t));
+    case 'pocock':
+    case 'lan-demets-pocock':
+      return beta * Math.log(1 + (Math.E - 1) * t);
+    default:
+      return beta * t; // linear
+  }
+}
 
 // === BOUNDARY ENGINE ===
 // (Task 3 adds boundary computation here)
