@@ -685,35 +685,314 @@ textarea {
      TAB PANELS
      ============================================================ -->
 <section class="tab-panel active" id="panel-data" role="tabpanel" aria-labelledby="tab-data">
-  <!-- Task 6 builds this -->
+
+  <!-- Outcome Type -->
   <div class="card">
-    <div class="card-title">Data Entry</div>
-    <p style="color:var(--text2)">Tab 1 content will be built in Task 6.</p>
+    <div class="card-title">Outcome Type</div>
+    <div class="radio-group">
+      <label>
+        <input type="radio" name="outcomeType" value="binary" checked> Binary (events/totals)
+      </label>
+      <label>
+        <input type="radio" name="outcomeType" value="continuous"> Continuous (means/SDs)
+      </label>
+    </div>
   </div>
+
+  <!-- Manual Data Entry Table -->
+  <div class="card">
+    <div class="card-title">Study Data</div>
+    <div style="display:flex; gap:0.75rem; margin-bottom:1rem; flex-wrap:wrap; align-items:center;">
+      <button class="btn btn-secondary btn-sm" id="btnAddRow" aria-label="Add a new study row">+ Add Row</button>
+      <button class="btn btn-ghost btn-sm" id="btnClearAll" aria-label="Clear all data">Clear All</button>
+
+      <div style="margin-left:auto;">
+        <div class="dropdown-wrap">
+          <button class="btn btn-ghost btn-sm" id="btnLoadExample" aria-label="Load example dataset">Load Example &#9662;</button>
+          <div class="dropdown-menu" id="exampleDropdown">
+            <button class="dropdown-item" data-example="0">
+              Aprotinin for Bleeding
+              <span class="dropdown-item-sub">Cochrane CD004338 -- 15 RCTs, binary (RR). Boundary crossed early.</span>
+            </button>
+            <button class="dropdown-item" data-example="1">
+              Therapeutic Hypothermia
+              <span class="dropdown-item-sub">Cochrane CD003311 -- 11 RCTs, binary (RR). Crossed near RIS.</span>
+            </button>
+            <button class="dropdown-item" data-example="2">
+              IV Magnesium for MI
+              <span class="dropdown-item-sub">Teo/ISIS-4 -- 16 RCTs, binary (OR). Never crosses boundary.</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="data-table-container">
+      <table class="data-table" id="dataTable">
+        <thead id="dataTableHead">
+          <!-- Populated by JS based on outcome type -->
+        </thead>
+        <tbody id="dataTableBody">
+          <!-- Rows populated by JS -->
+        </tbody>
+        <tfoot id="dataTableFoot">
+          <!-- Totals row -->
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  <!-- Paste Data -->
+  <div class="card">
+    <div class="card-title">Paste Data</div>
+    <p style="color:var(--text2); font-size:0.85rem; margin-bottom:0.75rem;">
+      Paste tab-separated data from Excel, RevMan, or any spreadsheet.
+      Include a header row. Binary columns: Study, Year, Events_Exp, N_Exp, Events_Ctrl, N_Ctrl.
+      Continuous: Study, Year, Mean_Exp, SD_Exp, N_Exp, Mean_Ctrl, SD_Ctrl, N_Ctrl.
+    </p>
+    <textarea id="pasteArea" placeholder="Study&#9;Year&#9;Events_Exp&#9;N_Exp&#9;Events_Ctrl&#9;N_Ctrl&#10;Smith 2010&#9;2010&#9;12&#9;100&#9;24&#9;98&#10;Jones 2012&#9;2012&#9;8&#9;55&#9;15&#9;60"></textarea>
+    <div style="margin-top:0.75rem;">
+      <button class="btn btn-secondary btn-sm" id="btnParse" aria-label="Parse pasted data">Parse &amp; Load</button>
+    </div>
+  </div>
+
 </section>
 
 <section class="tab-panel" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings">
-  <!-- Task 7 builds this -->
-  <div class="card">
-    <div class="card-title">TSA Settings</div>
-    <p style="color:var(--text2)">Tab 2 content will be built in Task 7.</p>
+
+  <div class="settings-grid">
+
+    <!-- Left column: Analysis parameters -->
+    <div>
+      <div class="card">
+        <div class="card-title">Analysis Parameters</div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="settingAlpha">Alpha (two-sided)</label>
+            <input type="number" id="settingAlpha" value="0.05" step="0.01" min="0.001" max="0.20">
+          </div>
+          <div class="form-group">
+            <label for="settingPower">Power (1 - beta)</label>
+            <select id="settingPower">
+              <option value="0.80" selected>80%</option>
+              <option value="0.90">90%</option>
+              <option value="0.95">95%</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="settingMeasure">Effect Measure</label>
+            <select id="settingMeasure">
+              <option value="RR">Relative Risk (RR)</option>
+              <option value="OR">Odds Ratio (OR)</option>
+              <option value="RD">Risk Difference (RD)</option>
+              <option value="MD">Mean Difference (MD)</option>
+              <option value="SMD">Standardised Mean Difference (SMD)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="settingAnticipated">Anticipated Effect</label>
+            <input type="number" id="settingAnticipated" step="0.01" placeholder="Auto from pooled estimate">
+            <span style="font-size:0.75rem; color:var(--text2);">Leave blank to auto-fill from data</span>
+          </div>
+          <div class="form-group" id="controlRateGroup">
+            <label for="settingControlRate">Control Event Rate</label>
+            <input type="number" id="settingControlRate" step="0.01" min="0" max="1" placeholder="Auto from data">
+            <span style="font-size:0.75rem; color:var(--text2);">Leave blank to auto-fill</span>
+          </div>
+        </div>
+
+        <div class="form-row" id="sigmaGroup" style="display:none;">
+          <div class="form-group">
+            <label for="settingSigma">Pooled SD (sigma)</label>
+            <input type="number" id="settingSigma" step="0.1" placeholder="For MD measure">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right column: Boundary settings -->
+    <div>
+      <div class="card">
+        <div class="card-title">Boundary Settings</div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="settingSpending">Alpha-Spending Function</label>
+            <select id="settingSpending">
+              <option value="obrien-fleming" selected>O'Brien-Fleming</option>
+              <option value="pocock">Pocock</option>
+              <option value="lan-demets-of">Lan-DeMets (OF type)</option>
+              <option value="lan-demets-pocock">Lan-DeMets (Pocock type)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="settingFutility">Futility Boundary</label>
+            <select id="settingFutility">
+              <option value="off" selected>Off</option>
+              <option value="non-binding">Non-binding</option>
+              <option value="binding">Binding</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row" id="betaSpendingGroup" style="display:none;">
+          <div class="form-group">
+            <label for="settingBetaSpending">Beta-Spending Function</label>
+            <select id="settingBetaSpending">
+              <option value="obrien-fleming" selected>O'Brien-Fleming</option>
+              <option value="pocock">Pocock</option>
+              <option value="lan-demets-of">Lan-DeMets (OF type)</option>
+              <option value="lan-demets-pocock">Lan-DeMets (Pocock type)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Heterogeneity</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="settingD2">D&sup2; (diversity)</label>
+            <input type="number" id="settingD2" step="0.01" min="0" placeholder="Auto from I&sup2;">
+            <span style="font-size:0.75rem; color:var(--text2);">Leave blank for auto-calculation from I&sup2;</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:1.5rem;">
+        <button class="btn btn-primary" id="btnRunTSA" style="width:100%; padding:0.85rem; font-size:1.05rem;">
+          Run TSA
+        </button>
+      </div>
+    </div>
+
   </div>
+
 </section>
 
 <section class="tab-panel" id="panel-results" role="tabpanel" aria-labelledby="tab-results">
-  <!-- Task 7 builds this -->
-  <div class="card">
-    <div class="card-title">TSA Diagram</div>
-    <p style="color:var(--text2)">Tab 3 content will be built in Task 7.</p>
+
+  <!-- Verdict Box -->
+  <div class="verdict-box inconclusive" id="verdictBox">
+    <div class="verdict-title" id="verdictTitle">Run TSA to see results</div>
+    <div class="verdict-text" id="verdictText">
+      Enter study data in Tab 1, configure settings in Tab 2, then click "Run TSA".
+    </div>
+    <span class="sr-only" id="verdictSR"></span>
   </div>
+
+  <div class="results-layout">
+    <!-- Main content: TSA diagram + forest plot -->
+    <div>
+      <!-- TSA Diagram -->
+      <div class="canvas-wrap">
+        <canvas id="tsaCanvas" width="1200" height="700"
+                aria-label="Trial Sequential Analysis monitoring diagram showing Z-curve and boundaries"
+                role="img"></canvas>
+      </div>
+
+      <!-- Cumulative Forest Plot -->
+      <div class="canvas-wrap">
+        <canvas id="forestCanvas" width="1200" height="600"
+                aria-label="Cumulative forest plot showing pooled effect at each sequential look"
+                role="img"></canvas>
+      </div>
+    </div>
+
+    <!-- Sidebar: RIS panel -->
+    <div>
+      <div class="card ris-panel" id="risPanel">
+        <div class="card-title">Information Summary</div>
+        <div class="ris-item">
+          <span class="ris-label">Required Info Size</span>
+          <span class="ris-value" id="risValue">--</span>
+        </div>
+        <div class="ris-item">
+          <span class="ris-label">Adjusted RIS (with D&sup2;)</span>
+          <span class="ris-value" id="risAdjValue">--</span>
+        </div>
+        <div class="ris-item">
+          <span class="ris-label">Current Info</span>
+          <span class="ris-value" id="risCurrentValue">--</span>
+        </div>
+        <div class="ris-item">
+          <span class="ris-label">% of RIS</span>
+          <span class="ris-value" id="risPercent">--</span>
+        </div>
+        <div class="ris-item">
+          <span class="ris-label">Remaining</span>
+          <span class="ris-value" id="risRemaining">--</span>
+        </div>
+        <div class="ris-item">
+          <span class="ris-label">D&sup2; (diversity)</span>
+          <span class="ris-value" id="risD2">--</span>
+        </div>
+        <div class="ris-item">
+          <span class="ris-label">I&sup2;</span>
+          <span class="ris-value" id="risI2">--</span>
+        </div>
+        <div class="ris-item">
+          <span class="ris-label">&tau;&sup2;</span>
+          <span class="ris-value" id="risTau2">--</span>
+        </div>
+        <div class="ris-item">
+          <span class="ris-label">Number of Looks</span>
+          <span class="ris-value" id="risLooks">--</span>
+        </div>
+        <div class="ris-item">
+          <span class="ris-label">Conditional Power</span>
+          <span class="ris-value" id="risCondPower">--</span>
+        </div>
+        <div class="ris-item">
+          <span class="ris-label">TSA-Adjusted CI</span>
+          <span class="ris-value" id="risAdjCI" style="font-size:0.85rem;">--</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </section>
 
 <section class="tab-panel" id="panel-report" role="tabpanel" aria-labelledby="tab-report">
-  <!-- Task 8 builds this -->
+
   <div class="card">
-    <div class="card-title">Report &amp; Export</div>
-    <p style="color:var(--text2)">Tab 4 content will be built in Task 8.</p>
+    <div class="card-title">Auto-Generated Report Text</div>
+    <p style="color:var(--text2); font-size:0.85rem; margin-bottom:0.75rem;">
+      This text is generated from your TSA results. Copy it directly into your manuscript methods or results section.
+    </p>
+    <div class="report-text" id="reportText">
+      Run TSA (Tabs 1-2) to generate report text.
+    </div>
   </div>
+
+  <div class="card">
+    <div class="card-title">Export</div>
+    <div class="export-row">
+      <button class="btn btn-secondary" id="btnCopyReport" aria-label="Copy report text to clipboard">
+        Copy Report to Clipboard
+      </button>
+      <button class="btn btn-secondary" id="btnDownloadPNG" aria-label="Download TSA diagram as PNG image">
+        Download PNG
+      </button>
+      <button class="btn btn-secondary" id="btnDownloadCSV" aria-label="Download boundary values as CSV">
+        Download CSV
+      </button>
+      <button class="btn btn-secondary" id="btnDownloadJSON" aria-label="Download full results as JSON">
+        Download JSON
+      </button>
+    </div>
+  </div>
+
 </section>
 
 <!-- ============================================================
@@ -1614,13 +1893,1260 @@ function cumulativeMA(studies, measure) {
 }
 
 // === TSA ENGINE ===
-// (Task 5 adds TSA orchestration here)
+
+/**
+ * Main TSA computation: orchestrates cumulative MA, RIS, boundaries, and verdict.
+ *
+ * @param {object[]} studies - array of study data objects
+ * @param {object} settings - TSA settings:
+ *   {
+ *     measure: 'OR'|'RR'|'RD'|'MD'|'SMD',
+ *     type: 'binary'|'continuous',
+ *     alpha: 0.05,
+ *     power: 0.80,
+ *     anticipatedEffect: number (on native scale: OR/RR for binary, MD/SMD for continuous),
+ *     controlRate: number (binary only),
+ *     sigma: number (continuous MD only, pooled SD),
+ *     alphaSpendingType: 'obrien-fleming'|'pocock'|'lan-demets-of'|'lan-demets-pocock',
+ *     futilityEnabled: false,
+ *     futilityBinding: false,
+ *     betaSpendingType: 'obrien-fleming',
+ *     customD2: null (auto) or number
+ *   }
+ * @returns {object} TSA result
+ */
+function computeTSA(studies, settings) {
+  var measure = settings.measure ?? 'OR';
+  var alpha = settings.alpha ?? 0.05;
+  var power = settings.power ?? 0.80;
+  var beta = 1 - power;
+  var spendingType = settings.alphaSpendingType ?? 'obrien-fleming';
+
+  // Step 1: Cumulative meta-analysis
+  var cumulative = cumulativeMA(studies, measure);
+  if (cumulative.length === 0) {
+    return {
+      cumulative: [], boundaries: [], futility: null,
+      ris: 0, risAdj: 0, d2: 0, i2: 0, tau2: 0,
+      verdict: 'INCONCLUSIVE', verdictDetail: 'No studies provided.',
+      crossedAtLook: null, adjustedCI: { lower: 0, upper: 0 },
+      conditionalPower: 0, zCurve: []
+    };
+  }
+
+  // Step 2: Get heterogeneity from final cumulative pooling
+  var finalPool = cumulative[cumulative.length - 1];
+  var i2 = finalPool.I2;
+  var tau2 = finalPool.tau2;
+
+  // D^2 (diversity): use custom if provided, otherwise compute from I^2
+  var d2 = (settings.customD2 != null) ? settings.customD2 : diversityAdjust(i2);
+
+  // Step 3: Compute RIS
+  var anticipatedEffect = settings.anticipatedEffect;
+  if (anticipatedEffect == null) {
+    // Auto-fill from pooled estimate
+    if (measure === 'OR' || measure === 'RR') {
+      anticipatedEffect = Math.exp(finalPool.estimate); // back-transform from log scale
+    } else {
+      anticipatedEffect = finalPool.estimate;
+    }
+  }
+
+  var controlRate = settings.controlRate;
+  if (controlRate == null && settings.type === 'binary') {
+    // Compute average control event rate from studies
+    var totalEC = 0, totalNC = 0;
+    studies.forEach(function(s) { totalEC += s.eC; totalNC += s.nC; });
+    controlRate = totalEC / totalNC;
+  }
+
+  var risParams = {
+    type: settings.type ?? 'binary',
+    measure: measure,
+    anticipatedEffect: anticipatedEffect,
+    controlRate: controlRate,
+    sigma: settings.sigma ?? 1,
+    alpha: alpha,
+    power: power
+  };
+  var ris = sampleSizeRIS(risParams);
+  var risAdj = Math.ceil(ris * (1 + d2));
+
+  // Step 4: Compute information fractions
+  var totalN = finalPool.N_cum;
+  for (var k = 0; k < cumulative.length; k++) {
+    cumulative[k].IF = cumulative[k].N_cum / risAdj;
+  }
+
+  // Step 5: Build the z-curve (information fraction, cumulative Z)
+  var zCurve = cumulative.map(function(c) {
+    return { t: c.IF, z: c.z, k: c.k, name: c.name, N: c.N_cum };
+  });
+
+  // Step 6: Compute boundaries at the information fractions
+  var infoFractions = cumulative.map(function(c) { return Math.min(c.IF, 2.0); });
+  var boundaries = computeBoundaries(infoFractions, spendingType, alpha);
+
+  // Step 7: Futility boundaries (if enabled)
+  var futility = null;
+  if (settings.futilityEnabled) {
+    var betaType = settings.betaSpendingType ?? 'obrien-fleming';
+    futility = computeFutilityBoundaries(
+      infoFractions, betaType, beta, settings.futilityBinding ?? false
+    );
+  }
+
+  // Step 8: Determine verdict
+  var verdict = 'INCONCLUSIVE';
+  var verdictDetail = '';
+  var crossedAtLook = null;
+
+  for (var ki = 0; ki < cumulative.length; ki++) {
+    var absZ = Math.abs(cumulative[ki].z);
+    var boundaryZ = boundaries[ki] ? boundaries[ki].z : Infinity;
+
+    // Check efficacy crossing
+    if (absZ >= boundaryZ) {
+      crossedAtLook = ki + 1;
+      // For log(RR) < 0 or log(OR) < 0, negative Z means experimental is better
+      if (measure === 'OR' || measure === 'RR') {
+        verdict = cumulative[ki].estimate < 0 ? 'BENEFIT' : 'HARM';
+      } else if (measure === 'RD') {
+        verdict = cumulative[ki].estimate < 0 ? 'BENEFIT' : 'HARM';
+      } else {
+        // For MD/SMD, assume positive = better
+        verdict = cumulative[ki].estimate > 0 ? 'BENEFIT' : 'HARM';
+      }
+      break;
+    }
+
+    // Check futility crossing
+    if (futility && futility[ki]) {
+      if (absZ <= futility[ki].z) {
+        crossedAtLook = ki + 1;
+        verdict = 'FUTILITY';
+        break;
+      }
+    }
+  }
+
+  // Verdict detail text
+  switch (verdict) {
+    case 'BENEFIT':
+      verdictDetail = 'The cumulative Z-curve crossed the monitoring boundary for benefit at look ' +
+        crossedAtLook + ' (' + cumulative[crossedAtLook - 1].N_cum.toLocaleString() + ' participants, ' +
+        (cumulative[crossedAtLook - 1].IF * 100).toFixed(1) + '% of RIS). ' +
+        'The evidence is sufficient to conclude a beneficial effect.';
+      break;
+    case 'HARM':
+      verdictDetail = 'The cumulative Z-curve crossed the monitoring boundary for harm at look ' +
+        crossedAtLook + '. The evidence indicates a harmful effect of the intervention.';
+      break;
+    case 'FUTILITY':
+      verdictDetail = 'The cumulative Z-curve crossed the futility boundary at look ' +
+        crossedAtLook + '. The anticipated effect is unlikely to be demonstrated even with additional trials.';
+      break;
+    case 'INCONCLUSIVE':
+      if (totalN >= risAdj) {
+        verdictDetail = 'The accumulated evidence exceeds the required information size (' +
+          totalN.toLocaleString() + ' of ' + risAdj.toLocaleString() + ' participants) ' +
+          'but the Z-curve has not crossed the monitoring boundary. The result is inconclusive.';
+      } else {
+        verdictDetail = 'The accumulated evidence (' + totalN.toLocaleString() + ' of ' +
+          risAdj.toLocaleString() + ' required participants, ' +
+          (totalN / risAdj * 100).toFixed(1) + '% of RIS) has not reached the monitoring boundary. ' +
+          'More trials are needed before a firm conclusion can be drawn.';
+      }
+      break;
+  }
+
+  // Step 9: TSA-adjusted confidence interval at final look
+  var finalBoundary = boundaries[boundaries.length - 1];
+  var adjustedCI = {
+    lower: finalPool.estimate - (finalBoundary ? finalBoundary.z : 1.96) * finalPool.se,
+    upper: finalPool.estimate + (finalBoundary ? finalBoundary.z : 1.96) * finalPool.se
+  };
+
+  // Step 10: Conditional power estimate
+  var currentIF = finalPool.IF;
+  var currentZ = finalPool.z;
+  var conditionalPower = 0;
+  if (currentIF > 0 && currentIF < 1) {
+    var drift = currentZ / Math.sqrt(currentIF);
+    var finalBoundZ = boundaries[boundaries.length - 1] ? boundaries[boundaries.length - 1].z : 1.96;
+    conditionalPower = 1 - normalCDF(finalBoundZ - Math.abs(drift)) +
+                       normalCDF(-finalBoundZ - Math.abs(drift));
+  } else if (currentIF >= 1) {
+    conditionalPower = verdict !== 'INCONCLUSIVE' ? 1 : 0;
+  }
+
+  return {
+    cumulative: cumulative,
+    boundaries: boundaries,
+    futility: futility,
+    ris: ris,
+    risAdj: risAdj,
+    d2: d2,
+    i2: i2,
+    tau2: tau2,
+    verdict: verdict,
+    verdictDetail: verdictDetail,
+    crossedAtLook: crossedAtLook,
+    adjustedCI: adjustedCI,
+    conditionalPower: Math.max(0, Math.min(1, conditionalPower)),
+    zCurve: zCurve
+  };
+}
 
 // === CHART ENGINE ===
-// (Task 7 adds drawing functions here)
+
+/**
+ * Draw the TSA monitoring diagram on canvas.
+ * @param {HTMLCanvasElement} canvas
+ * @param {object} tsaResult - output of computeTSA()
+ * @param {object} opts - optional overrides
+ */
+function drawTSADiagram(canvas, tsaResult, opts) {
+  opts = opts ?? {};
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width;
+  var H = canvas.height;
+  var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+  // Colors
+  var bgColor = isDark ? '#0f0f1a' : '#f4f6f9';
+  var gridColor = isDark ? '#2a2a4a' : '#d0d5dd';
+  var textColor = isDark ? '#e0e0e8' : '#1a1a2e';
+  var textMuted = isDark ? '#a0a0b8' : '#555570';
+  var boundaryColor = '#ff5252';
+  var futilityColor = '#00d4ff';
+  var zCurveColor = isDark ? '#ffffff' : '#000000';
+  var risLineColor = isDark ? '#555570' : '#999';
+  var crossedColor = '#00e676';
+  var notCrossedColor = '#ffc107';
+
+  // Clear
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(0, 0, W, H);
+
+  // Margins
+  var margin = { top: 50, right: 60, bottom: 70, left: 80 };
+  var plotW = W - margin.left - margin.right;
+  var plotH = H - margin.top - margin.bottom;
+
+  // Determine axes ranges
+  var maxIF = 1.0;
+  tsaResult.zCurve.forEach(function(p) {
+    if (p.t > maxIF) maxIF = p.t;
+  });
+  maxIF = Math.max(maxIF * 1.1, 1.05);
+
+  var maxZ = 3;
+  tsaResult.boundaries.forEach(function(b) {
+    if (b.z > maxZ) maxZ = b.z;
+  });
+  tsaResult.zCurve.forEach(function(p) {
+    if (Math.abs(p.z) > maxZ) maxZ = Math.abs(p.z);
+  });
+  maxZ = Math.ceil(maxZ + 0.5);
+
+  // Scale functions
+  function xScale(t) { return margin.left + (t / maxIF) * plotW; }
+  function yScale(z) { return margin.top + plotH / 2 - (z / maxZ) * (plotH / 2); }
+
+  // Grid lines
+  ctx.strokeStyle = gridColor;
+  ctx.lineWidth = 0.5;
+  ctx.setLineDash([4, 4]);
+
+  // Horizontal grid (Z values)
+  for (var gz = -maxZ; gz <= maxZ; gz++) {
+    ctx.beginPath();
+    ctx.moveTo(margin.left, yScale(gz));
+    ctx.lineTo(margin.left + plotW, yScale(gz));
+    ctx.stroke();
+  }
+
+  // Vertical grid (IF values)
+  for (var gt = 0; gt <= maxIF; gt += 0.2) {
+    ctx.beginPath();
+    ctx.moveTo(xScale(gt), margin.top);
+    ctx.lineTo(xScale(gt), margin.top + plotH);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // Zero line
+  ctx.strokeStyle = textMuted;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(margin.left, yScale(0));
+  ctx.lineTo(margin.left + plotW, yScale(0));
+  ctx.stroke();
+
+  // RIS vertical line at IF = 1.0
+  ctx.strokeStyle = risLineColor;
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([6, 4]);
+  ctx.beginPath();
+  ctx.moveTo(xScale(1.0), margin.top);
+  ctx.lineTo(xScale(1.0), margin.top + plotH);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Label RIS line
+  ctx.fillStyle = textMuted;
+  ctx.font = '11px Consolas, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('RIS', xScale(1.0), margin.top - 8);
+
+  // Draw efficacy boundaries (upper)
+  if (tsaResult.boundaries.length > 0) {
+    ctx.strokeStyle = boundaryColor;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    tsaResult.boundaries.forEach(function(b, i) {
+      var x = xScale(tsaResult.zCurve[i] ? tsaResult.zCurve[i].t : b.t);
+      var y = yScale(b.z);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    // Lower mirror
+    ctx.beginPath();
+    tsaResult.boundaries.forEach(function(b, i) {
+      var x = xScale(tsaResult.zCurve[i] ? tsaResult.zCurve[i].t : b.t);
+      var y = yScale(-b.z);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    // Dots on boundary
+    tsaResult.boundaries.forEach(function(b, i) {
+      var x = xScale(tsaResult.zCurve[i] ? tsaResult.zCurve[i].t : b.t);
+      ctx.fillStyle = boundaryColor;
+      ctx.beginPath(); ctx.arc(x, yScale(b.z), 4, 0, 2 * Math.PI); ctx.fill();
+      ctx.beginPath(); ctx.arc(x, yScale(-b.z), 4, 0, 2 * Math.PI); ctx.fill();
+    });
+  }
+
+  // Draw futility boundaries (if present)
+  if (tsaResult.futility && tsaResult.futility.length > 0) {
+    ctx.strokeStyle = futilityColor;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    // Upper futility line
+    ctx.beginPath();
+    tsaResult.futility.forEach(function(f, i) {
+      var x = xScale(tsaResult.zCurve[i] ? tsaResult.zCurve[i].t : f.t);
+      var y = yScale(f.z);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    // Lower mirror
+    ctx.beginPath();
+    tsaResult.futility.forEach(function(f, i) {
+      var x = xScale(tsaResult.zCurve[i] ? tsaResult.zCurve[i].t : f.t);
+      var y = yScale(-f.z);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Draw Z-curve
+  if (tsaResult.zCurve.length > 0) {
+    ctx.strokeStyle = zCurveColor;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    tsaResult.zCurve.forEach(function(p, i) {
+      var x = xScale(p.t);
+      var y = yScale(p.z);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    // Dots on Z-curve
+    tsaResult.zCurve.forEach(function(p, i) {
+      var x = xScale(p.t);
+      var y = yScale(p.z);
+      var isLast = (i === tsaResult.zCurve.length - 1);
+      var isCrossed = tsaResult.crossedAtLook === (i + 1);
+      ctx.fillStyle = isCrossed ? crossedColor : (isLast ? notCrossedColor : zCurveColor);
+      var radius = isLast ? 7 : (isCrossed ? 7 : 4);
+      ctx.beginPath(); ctx.arc(x, y, radius, 0, 2 * Math.PI); ctx.fill();
+
+      // Study labels (small, angled)
+      if (tsaResult.zCurve.length <= 20) {
+        ctx.save();
+        ctx.fillStyle = textMuted;
+        ctx.font = '9px Consolas, monospace';
+        ctx.textAlign = 'left';
+        ctx.translate(x + 5, y - 8);
+        ctx.rotate(-0.4);
+        ctx.fillText(p.name ?? ('Look ' + (i + 1)), 0, 0);
+        ctx.restore();
+      }
+    });
+  }
+
+  // Axes labels
+  ctx.fillStyle = textColor;
+  ctx.font = 'bold 13px Consolas, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('Information Fraction (%)', margin.left + plotW / 2, H - 15);
+
+  ctx.save();
+  ctx.translate(18, margin.top + plotH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('Cumulative Z-statistic', 0, 0);
+  ctx.restore();
+
+  // Title
+  ctx.font = 'bold 16px Consolas, monospace';
+  ctx.fillText('Trial Sequential Analysis Monitoring Diagram', margin.left + plotW / 2, 25);
+
+  // Axis tick labels
+  ctx.font = '11px Consolas, monospace';
+  ctx.textAlign = 'center';
+  for (var tt = 0; tt <= maxIF; tt += 0.2) {
+    ctx.fillStyle = textMuted;
+    ctx.fillText((tt * 100).toFixed(0) + '%', xScale(tt), margin.top + plotH + 20);
+  }
+
+  ctx.textAlign = 'right';
+  for (var tz = -maxZ; tz <= maxZ; tz++) {
+    ctx.fillStyle = textMuted;
+    ctx.fillText(tz.toString(), margin.left - 10, yScale(tz) + 4);
+  }
+
+  // Legend
+  var legendX = margin.left + 10;
+  var legendY = margin.top + 10;
+  ctx.font = '11px Consolas, monospace';
+  ctx.textAlign = 'left';
+
+  function legendItem(x, y, color, lineStyle, label) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.setLineDash(lineStyle);
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 25, y); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = textColor;
+    ctx.fillText(label, x + 30, y + 4);
+  }
+
+  legendItem(legendX, legendY, boundaryColor, [], 'Efficacy boundary');
+  legendItem(legendX, legendY + 18, zCurveColor, [], 'Z-curve');
+  if (tsaResult.futility) {
+    legendItem(legendX, legendY + 36, futilityColor, [6, 4], 'Futility boundary');
+  }
+}
+
+/**
+ * Draw cumulative forest plot.
+ * @param {HTMLCanvasElement} canvas
+ * @param {object} tsaResult
+ * @param {object} opts
+ */
+function drawCumulativeForest(canvas, tsaResult, opts) {
+  opts = opts ?? {};
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width;
+  var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+  var cum = tsaResult.cumulative;
+  if (!cum || cum.length === 0) return;
+
+  var measure = opts.measure ?? 'OR';
+  var isLog = (measure === 'OR' || measure === 'RR');
+
+  // Adjust canvas height based on number of studies
+  var rowHeight = 28;
+  var headerHeight = 40;
+  var footerHeight = 40;
+  var neededH = headerHeight + cum.length * rowHeight + footerHeight;
+  canvas.height = Math.max(neededH, 300);
+  var H = canvas.height;
+
+  // Colors
+  var bgColor = isDark ? '#0f0f1a' : '#f4f6f9';
+  var textColor = isDark ? '#e0e0e8' : '#1a1a2e';
+  var textMuted = isDark ? '#a0a0b8' : '#555570';
+  var gridColor = isDark ? '#2a2a4a' : '#d0d5dd';
+  var diamondColor = isDark ? '#00d4ff' : '#0077cc';
+  var ciLineColor = isDark ? '#808090' : '#666';
+
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(0, 0, W, H);
+
+  // Layout: [Name col] [Plot area] [Estimate text]
+  var nameColW = 200;
+  var estColW = 160;
+  var plotLeft = nameColW;
+  var plotRight = W - estColW;
+  var plotW = plotRight - plotLeft;
+
+  // Find range for plot
+  var allLower = cum.map(function(c) { return isLog ? Math.exp(c.ci_lower) : c.ci_lower; });
+  var allUpper = cum.map(function(c) { return isLog ? Math.exp(c.ci_upper) : c.ci_upper; });
+  var minVal = Math.min.apply(null, allLower) * 0.9;
+  var maxVal = Math.max.apply(null, allUpper) * 1.1;
+  if (isLog) {
+    minVal = Math.max(0.05, minVal);
+    maxVal = Math.min(20, maxVal);
+  }
+
+  // Null line
+  var nullVal = isLog ? 1 : 0;
+
+  function xScaleF(val) {
+    if (isLog) {
+      var logMin = Math.log(minVal);
+      var logMax = Math.log(maxVal);
+      return plotLeft + ((Math.log(val) - logMin) / (logMax - logMin)) * plotW;
+    }
+    return plotLeft + ((val - minVal) / (maxVal - minVal)) * plotW;
+  }
+
+  // Header
+  ctx.fillStyle = textColor;
+  ctx.font = 'bold 12px Consolas, monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('Study (cumulative)', 10, headerHeight - 12);
+  ctx.textAlign = 'center';
+  ctx.fillText('Cumulative ' + measure, plotLeft + plotW / 2, headerHeight - 12);
+  ctx.textAlign = 'left';
+  ctx.fillText('Estimate [95% CI]', plotRight + 10, headerHeight - 12);
+
+  // Null line
+  ctx.strokeStyle = gridColor;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(xScaleF(nullVal), headerHeight);
+  ctx.lineTo(xScaleF(nullVal), headerHeight + cum.length * rowHeight);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Rows
+  cum.forEach(function(c, i) {
+    var y = headerHeight + (i + 0.5) * rowHeight;
+    var est = isLog ? Math.exp(c.estimate) : c.estimate;
+    var lo = isLog ? Math.exp(c.ci_lower) : c.ci_lower;
+    var hi = isLog ? Math.exp(c.ci_upper) : c.ci_upper;
+
+    // Clamp for display
+    var loClamp = Math.max(lo, minVal);
+    var hiClamp = Math.min(hi, maxVal);
+
+    // Study name
+    ctx.fillStyle = textColor;
+    ctx.font = '11px Consolas, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText((i + 1) + '. ' + (c.name ?? ('Look ' + c.k)), 10, y + 4);
+
+    // CI line
+    ctx.strokeStyle = ciLineColor;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(xScaleF(loClamp), y);
+    ctx.lineTo(xScaleF(hiClamp), y);
+    ctx.stroke();
+
+    // Diamond for estimate (size grows with cumulative k)
+    var dSize = 3 + Math.min(i, 8);
+    ctx.fillStyle = diamondColor;
+    ctx.beginPath();
+    var dx = xScaleF(est);
+    ctx.moveTo(dx, y - dSize);
+    ctx.lineTo(dx + dSize, y);
+    ctx.lineTo(dx, y + dSize);
+    ctx.lineTo(dx - dSize, y);
+    ctx.closePath();
+    ctx.fill();
+
+    // Estimate text
+    ctx.fillStyle = textMuted;
+    ctx.textAlign = 'left';
+    var estText;
+    if (isLog) {
+      estText = est.toFixed(2) + ' [' + lo.toFixed(2) + ', ' + hi.toFixed(2) + ']';
+    } else {
+      estText = est.toFixed(3) + ' [' + lo.toFixed(3) + ', ' + hi.toFixed(3) + ']';
+    }
+    ctx.fillText(estText, plotRight + 10, y + 4);
+  });
+
+  // Title
+  ctx.fillStyle = textColor;
+  ctx.font = 'bold 14px Consolas, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('Cumulative Forest Plot', W / 2, 18);
+}
 
 // === UI ENGINE ===
-// (Tasks 6, 7, 8 add UI functions here)
+
+// ---- Data Entry State ----
+var currentOutcomeType = 'binary';
+var currentStudies = []; // populated from table or examples
+
+// ---- Outcome type switching ----
+document.querySelectorAll('input[name="outcomeType"]').forEach(function(radio) {
+  radio.addEventListener('change', function() {
+    currentOutcomeType = this.value;
+    renderDataTable();
+  });
+});
+
+// ---- Table rendering ----
+function getTableColumns() {
+  if (currentOutcomeType === 'binary') {
+    return [
+      { key: 'name',  label: 'Study',       type: 'text',   width: '160px' },
+      { key: 'year',  label: 'Year',         type: 'number', width: '70px' },
+      { key: 'eE',    label: 'Events Exp',   type: 'number', width: '90px' },
+      { key: 'nE',    label: 'N Exp',        type: 'number', width: '80px' },
+      { key: 'eC',    label: 'Events Ctrl',  type: 'number', width: '90px' },
+      { key: 'nC',    label: 'N Ctrl',       type: 'number', width: '80px' }
+    ];
+  } else {
+    return [
+      { key: 'name',  label: 'Study',       type: 'text',   width: '160px' },
+      { key: 'year',  label: 'Year',         type: 'number', width: '70px' },
+      { key: 'mE',    label: 'Mean Exp',     type: 'number', width: '90px' },
+      { key: 'sdE',   label: 'SD Exp',       type: 'number', width: '80px' },
+      { key: 'nE',    label: 'N Exp',        type: 'number', width: '80px' },
+      { key: 'mC',    label: 'Mean Ctrl',    type: 'number', width: '90px' },
+      { key: 'sdC',   label: 'SD Ctrl',      type: 'number', width: '80px' },
+      { key: 'nC',    label: 'N Ctrl',       type: 'number', width: '80px' }
+    ];
+  }
+}
+
+function renderDataTable() {
+  var cols = getTableColumns();
+  var head = document.getElementById('dataTableHead');
+  var body = document.getElementById('dataTableBody');
+  var foot = document.getElementById('dataTableFoot');
+
+  // Header
+  var headerHTML = '<tr><th class="row-num">#</th>';
+  cols.forEach(function(col) {
+    headerHTML += '<th style="width:' + col.width + '">' + col.label + '</th>';
+  });
+  headerHTML += '<th class="row-actions"></th></tr>';
+  head.innerHTML = headerHTML;
+
+  // Body - if no studies, add 3 empty rows
+  if (currentStudies.length === 0) {
+    currentStudies = [{}, {}, {}];
+  }
+
+  var bodyHTML = '';
+  currentStudies.forEach(function(study, i) {
+    bodyHTML += '<tr data-row="' + i + '"><td class="row-num">' + (i + 1) + '</td>';
+    cols.forEach(function(col) {
+      var val = study[col.key];
+      var displayVal = (val != null && val !== '') ? val : '';
+      bodyHTML += '<td><input type="' + col.type + '" data-key="' + col.key +
+        '" data-row="' + i + '" value="' + displayVal + '"' +
+        ' aria-label="' + col.label + ' for study ' + (i + 1) + '"></td>';
+    });
+    bodyHTML += '<td class="row-actions"><button data-remove="' + i +
+      '" aria-label="Remove study ' + (i + 1) + '" title="Remove row">&times;</button></td></tr>';
+  });
+  body.innerHTML = bodyHTML;
+
+  // Wire up cell editing
+  body.querySelectorAll('input').forEach(function(inp) {
+    inp.addEventListener('change', function() {
+      var row = parseInt(this.dataset.row);
+      var key = this.dataset.key;
+      if (this.type === 'number') {
+        var parsed = parseFloat(this.value);
+        currentStudies[row][key] = isFinite(parsed) ? parsed : null;
+      } else {
+        currentStudies[row][key] = this.value;
+      }
+      updateTotals();
+    });
+  });
+
+  // Wire up remove buttons
+  body.querySelectorAll('button[data-remove]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var row = parseInt(this.dataset.remove);
+      currentStudies.splice(row, 1);
+      if (currentStudies.length === 0) currentStudies = [{}];
+      renderDataTable();
+    });
+  });
+
+  updateTotals();
+}
+
+function updateTotals() {
+  var foot = document.getElementById('dataTableFoot');
+  var cols = getTableColumns();
+  var totals = {};
+  var count = 0;
+
+  currentStudies.forEach(function(s) {
+    var hasData = false;
+    cols.forEach(function(col) {
+      if (col.type === 'number' && col.key !== 'year') {
+        var val = s[col.key];
+        if (val != null && isFinite(val)) {
+          totals[col.key] = (totals[col.key] ?? 0) + val;
+          hasData = true;
+        }
+      }
+    });
+    if (hasData) count++;
+  });
+
+  var footHTML = '<tr><td class="row-num"></td>';
+  cols.forEach(function(col) {
+    if (col.key === 'name') {
+      footHTML += '<td><strong>Total (' + count + ' studies)</strong></td>';
+    } else if (col.key === 'year') {
+      footHTML += '<td></td>';
+    } else {
+      var tVal = totals[col.key];
+      footHTML += '<td style="font-family:var(--font-mono); text-align:right;">' +
+        (tVal != null ? tVal.toLocaleString() : '') + '</td>';
+    }
+  });
+  footHTML += '<td></td></tr>';
+  foot.innerHTML = footHTML;
+}
+
+// ---- Add Row ----
+document.getElementById('btnAddRow').addEventListener('click', function() {
+  currentStudies.push({});
+  renderDataTable();
+  // Focus the first cell of the new row
+  var body = document.getElementById('dataTableBody');
+  var lastRow = body.querySelector('tr:last-child input');
+  if (lastRow) lastRow.focus();
+});
+
+// ---- Clear All ----
+document.getElementById('btnClearAll').addEventListener('click', function() {
+  if (currentStudies.some(function(s) { return s.name || s.eE || s.mE; })) {
+    if (!confirm('Clear all data? This cannot be undone.')) return;
+  }
+  currentStudies = [{}, {}, {}];
+  renderDataTable();
+  showToast('Data cleared');
+});
+
+// ---- Example Loading ----
+(function initExampleDropdown() {
+  var btn = document.getElementById('btnLoadExample');
+  var menu = document.getElementById('exampleDropdown');
+
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    menu.classList.toggle('open');
+  });
+
+  document.addEventListener('click', function() {
+    menu.classList.remove('open');
+  });
+
+  menu.querySelectorAll('.dropdown-item').forEach(function(item) {
+    item.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var idx = parseInt(this.dataset.example);
+      var example = EXAMPLES[idx];
+
+      // Confirm if data exists
+      if (currentStudies.some(function(s) { return s.name; })) {
+        if (!confirm('Replace current data with "' + example.name + '"?')) {
+          menu.classList.remove('open');
+          return;
+        }
+      }
+
+      // Set outcome type
+      currentOutcomeType = example.type;
+      document.querySelector('input[name="outcomeType"][value="' + example.type + '"]').checked = true;
+
+      // Load studies (deep copy)
+      currentStudies = example.studies.map(function(s) { return Object.assign({}, s); });
+      renderDataTable();
+      menu.classList.remove('open');
+      showToast('Loaded: ' + example.name);
+    });
+  });
+})();
+
+// ---- Paste Parser ----
+document.getElementById('btnParse').addEventListener('click', function() {
+  var text = document.getElementById('pasteArea').value.trim();
+  if (!text) {
+    showToast('Paste area is empty');
+    return;
+  }
+
+  var lines = text.split('\n').map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
+  if (lines.length < 2) {
+    showToast('Need at least a header row and one data row');
+    return;
+  }
+
+  // Parse header
+  var header = lines[0].split('\t').map(function(h) { return h.trim().toLowerCase(); });
+
+  // Auto-detect column mappings
+  function findCol(patterns) {
+    for (var i = 0; i < header.length; i++) {
+      for (var j = 0; j < patterns.length; j++) {
+        if (header[i].indexOf(patterns[j]) >= 0) return i;
+      }
+    }
+    return -1;
+  }
+
+  var colName = findCol(['study', 'author', 'name', 'trial']);
+  var colYear = findCol(['year', 'date']);
+
+  var parsedStudies = [];
+  var isBinaryPaste = true;
+
+  // Try binary columns first
+  var colEE = findCol(['events_exp', 'event_exp', 'ee', 'events_e', 'e_exp']);
+  var colNE = findCol(['n_exp', 'ne', 'total_exp', 'n_e']);
+  var colEC = findCol(['events_ctrl', 'events_con', 'event_ctrl', 'ec', 'events_c', 'e_ctrl', 'e_con']);
+  var colNC = findCol(['n_ctrl', 'n_con', 'nc', 'total_ctrl', 'n_c']);
+
+  if (colEE < 0 || colNE < 0 || colEC < 0 || colNC < 0) {
+    // Try continuous columns
+    isBinaryPaste = false;
+    var colME = findCol(['mean_exp', 'me', 'mean_e']);
+    var colSDE = findCol(['sd_exp', 'sde', 'sd_e']);
+    colNE = findCol(['n_exp', 'ne', 'total_exp', 'n_e']);
+    var colMC = findCol(['mean_ctrl', 'mean_con', 'mc', 'mean_c']);
+    var colSDC = findCol(['sd_ctrl', 'sd_con', 'sdc', 'sd_c']);
+    colNC = findCol(['n_ctrl', 'n_con', 'nc', 'total_ctrl', 'n_c']);
+
+    if (colME < 0 || colSDE < 0 || colNE < 0 || colMC < 0 || colSDC < 0 || colNC < 0) {
+      showToast('Could not detect column headers. Use tab-separated format with standard names.');
+      return;
+    }
+
+    for (var pi = 1; pi < lines.length; pi++) {
+      var pcells = lines[pi].split('\t');
+      parsedStudies.push({
+        name: colName >= 0 ? pcells[colName] : ('Study ' + pi),
+        year: colYear >= 0 ? parseFloat(pcells[colYear]) : null,
+        mE: parseFloat(pcells[colME]),
+        sdE: parseFloat(pcells[colSDE]),
+        nE: parseFloat(pcells[colNE]),
+        mC: parseFloat(pcells[colMC]),
+        sdC: parseFloat(pcells[colSDC]),
+        nC: parseFloat(pcells[colNC])
+      });
+    }
+  } else {
+    for (var bi = 1; bi < lines.length; bi++) {
+      var bcells = lines[bi].split('\t');
+      parsedStudies.push({
+        name: colName >= 0 ? bcells[colName] : ('Study ' + bi),
+        year: colYear >= 0 ? parseFloat(bcells[colYear]) : null,
+        eE: parseFloat(bcells[colEE]),
+        nE: parseFloat(bcells[colNE]),
+        eC: parseFloat(bcells[colEC]),
+        nC: parseFloat(bcells[colNC])
+      });
+    }
+  }
+
+  // Validate
+  var valid = parsedStudies.filter(function(s) {
+    if (isBinaryPaste) return isFinite(s.eE) && isFinite(s.nE) && isFinite(s.eC) && isFinite(s.nC);
+    return isFinite(s.mE) && isFinite(s.sdE) && isFinite(s.nE) && isFinite(s.mC) && isFinite(s.sdC) && isFinite(s.nC);
+  });
+
+  if (valid.length === 0) {
+    showToast('No valid rows found. Check format.');
+    return;
+  }
+
+  currentOutcomeType = isBinaryPaste ? 'binary' : 'continuous';
+  document.querySelector('input[name="outcomeType"][value="' + currentOutcomeType + '"]').checked = true;
+  currentStudies = valid;
+  renderDataTable();
+  showToast('Parsed ' + valid.length + ' studies');
+});
+
+/**
+ * Read current table data into an array of study objects.
+ * Called by the Run TSA button.
+ */
+function readStudiesFromTable() {
+  var studies = [];
+  currentStudies.forEach(function(s) {
+    // Check that the study has enough data
+    if (currentOutcomeType === 'binary') {
+      if (isFinite(s.eE) && isFinite(s.nE) && isFinite(s.eC) && isFinite(s.nC)) {
+        studies.push(Object.assign({}, s));
+      }
+    } else {
+      if (isFinite(s.mE) && isFinite(s.sdE) && isFinite(s.nE) &&
+          isFinite(s.mC) && isFinite(s.sdC) && isFinite(s.nC)) {
+        studies.push(Object.assign({}, s));
+      }
+    }
+  });
+  return studies;
+}
+
+// ---- Initial render ----
+renderDataTable();
+
+// ---- Settings UI wiring ----
+(function initSettings() {
+  var futilitySelect = document.getElementById('settingFutility');
+  var betaGroup = document.getElementById('betaSpendingGroup');
+  var measureSelect = document.getElementById('settingMeasure');
+  var controlRateGroup = document.getElementById('controlRateGroup');
+  var sigmaGroup = document.getElementById('sigmaGroup');
+
+  futilitySelect.addEventListener('change', function() {
+    betaGroup.style.display = this.value === 'off' ? 'none' : 'flex';
+  });
+
+  measureSelect.addEventListener('change', function() {
+    var isBinary = ['OR', 'RR', 'RD'].indexOf(this.value) >= 0;
+    controlRateGroup.style.display = isBinary ? '' : 'none';
+    sigmaGroup.style.display = this.value === 'MD' ? '' : 'none';
+  });
+})();
+
+/**
+ * Read all settings from Tab 2 form inputs.
+ */
+function readSettings() {
+  var anticipatedRaw = document.getElementById('settingAnticipated').value;
+  var controlRateRaw = document.getElementById('settingControlRate').value;
+  var d2Raw = document.getElementById('settingD2').value;
+  var sigmaRaw = document.getElementById('settingSigma').value;
+
+  return {
+    measure: document.getElementById('settingMeasure').value,
+    type: currentOutcomeType,
+    alpha: parseFloat(document.getElementById('settingAlpha').value) || 0.05,
+    power: parseFloat(document.getElementById('settingPower').value) || 0.80,
+    anticipatedEffect: anticipatedRaw !== '' ? parseFloat(anticipatedRaw) : null,
+    controlRate: controlRateRaw !== '' ? parseFloat(controlRateRaw) : null,
+    sigma: sigmaRaw !== '' ? parseFloat(sigmaRaw) : null,
+    alphaSpendingType: document.getElementById('settingSpending').value,
+    futilityEnabled: document.getElementById('settingFutility').value !== 'off',
+    futilityBinding: document.getElementById('settingFutility').value === 'binding',
+    betaSpendingType: document.getElementById('settingBetaSpending').value,
+    customD2: d2Raw !== '' ? parseFloat(d2Raw) : null
+  };
+}
+
+// Store last TSA result for report/export
+var lastTSAResult = null;
+var lastSettings = null;
+
+// ---- Run TSA button ----
+document.getElementById('btnRunTSA').addEventListener('click', function() {
+  var studies = readStudiesFromTable();
+  if (studies.length < 2) {
+    showToast('Need at least 2 studies with complete data');
+    return;
+  }
+
+  var settings = readSettings();
+  lastSettings = settings;
+
+  try {
+    lastTSAResult = computeTSA(studies, settings);
+  } catch (err) {
+    showToast('Error: ' + err.message);
+    console.error(err);
+    return;
+  }
+
+  var result = lastTSAResult;
+
+  // Update verdict box
+  var verdictBox = document.getElementById('verdictBox');
+  var verdictTitle = document.getElementById('verdictTitle');
+  var verdictText = document.getElementById('verdictText');
+  var verdictSR = document.getElementById('verdictSR');
+
+  verdictBox.className = 'verdict-box';
+  switch (result.verdict) {
+    case 'BENEFIT':
+      verdictBox.classList.add('benefit');
+      verdictTitle.textContent = 'BENEFIT CONFIRMED';
+      break;
+    case 'HARM':
+      verdictBox.classList.add('harm');
+      verdictTitle.textContent = 'HARM CONFIRMED';
+      break;
+    case 'FUTILITY':
+      verdictBox.classList.add('futility');
+      verdictTitle.textContent = 'FUTILITY -- STOP';
+      break;
+    default:
+      verdictBox.classList.add('inconclusive');
+      verdictTitle.textContent = 'INCONCLUSIVE';
+  }
+  verdictText.textContent = result.verdictDetail;
+  verdictSR.textContent = 'TSA Verdict: ' + result.verdict + '. ' + result.verdictDetail;
+
+  // Update RIS panel
+  var finalCum = result.cumulative[result.cumulative.length - 1];
+  document.getElementById('risValue').textContent = result.ris.toLocaleString();
+  document.getElementById('risAdjValue').textContent = result.risAdj.toLocaleString();
+  document.getElementById('risCurrentValue').textContent = finalCum.N_cum.toLocaleString();
+  var pctRIS = (finalCum.N_cum / result.risAdj * 100);
+  document.getElementById('risPercent').textContent = pctRIS.toFixed(1) + '%';
+  var remaining = Math.max(0, result.risAdj - finalCum.N_cum);
+  document.getElementById('risRemaining').textContent = remaining > 0 ? remaining.toLocaleString() : 'Reached';
+  document.getElementById('risD2').textContent = result.d2.toFixed(3);
+  document.getElementById('risI2').textContent = (result.i2 * 100).toFixed(1) + '%';
+  document.getElementById('risTau2').textContent = result.tau2.toFixed(4);
+  document.getElementById('risLooks').textContent = result.cumulative.length;
+  document.getElementById('risCondPower').textContent = (result.conditionalPower * 100).toFixed(1) + '%';
+
+  var isLog = (settings.measure === 'OR' || settings.measure === 'RR');
+  if (isLog) {
+    document.getElementById('risAdjCI').textContent =
+      Math.exp(result.adjustedCI.lower).toFixed(3) + ' to ' +
+      Math.exp(result.adjustedCI.upper).toFixed(3);
+  } else {
+    document.getElementById('risAdjCI').textContent =
+      result.adjustedCI.lower.toFixed(3) + ' to ' +
+      result.adjustedCI.upper.toFixed(3);
+  }
+
+  // Draw charts
+  drawTSADiagram(document.getElementById('tsaCanvas'), result);
+  drawCumulativeForest(document.getElementById('forestCanvas'), result, { measure: settings.measure });
+
+  // Switch to results tab
+  switchTab('results');
+  showToast('TSA complete: ' + result.verdict);
+});
+
+// ---- Report Generation ----
+function generateReportText(result, settings) {
+  if (!result) return 'Run TSA to generate report text.';
+
+  var measure = settings.measure;
+  var isLog = (measure === 'OR' || measure === 'RR');
+  var finalCum = result.cumulative[result.cumulative.length - 1];
+  var pctRIS = (finalCum.N_cum / result.risAdj * 100).toFixed(1);
+
+  var spendingLabel = {
+    'obrien-fleming': "O'Brien-Fleming",
+    'pocock': 'Pocock',
+    'lan-demets-of': "Lan-DeMets (O'Brien-Fleming type)",
+    'lan-demets-pocock': 'Lan-DeMets (Pocock type)'
+  }[settings.alphaSpendingType] || settings.alphaSpendingType;
+
+  var ciLower, ciUpper, anticipatedText;
+  if (isLog) {
+    ciLower = Math.exp(result.adjustedCI.lower).toFixed(2);
+    ciUpper = Math.exp(result.adjustedCI.upper).toFixed(2);
+    anticipatedText = measure + ' of ' + (settings.anticipatedEffect != null ? settings.anticipatedEffect : Math.exp(finalCum.estimate)).toFixed(2);
+  } else {
+    ciLower = result.adjustedCI.lower.toFixed(2);
+    ciUpper = result.adjustedCI.upper.toFixed(2);
+    anticipatedText = measure + ' of ' + (settings.anticipatedEffect != null ? settings.anticipatedEffect : finalCum.estimate).toFixed(2);
+  }
+
+  var didCross = result.verdict === 'BENEFIT' || result.verdict === 'HARM';
+  var crossText = didCross ? 'crossed' : 'did not cross';
+  var directionText = '';
+  if (result.verdict === 'BENEFIT') directionText = ' for benefit';
+  else if (result.verdict === 'HARM') directionText = ' for harm';
+  else if (result.verdict === 'FUTILITY') directionText = '. The Z-curve crossed the futility boundary, suggesting the anticipated effect is unlikely to be demonstrated';
+
+  var text = 'Trial sequential analysis was performed using TSA Pro (Ahmad, 2026) ' +
+    'with a two-sided alpha of ' + (settings.alpha * 100).toFixed(0) + '%, ' +
+    'power of ' + (settings.power * 100).toFixed(0) + '%, ' +
+    'and an anticipated ' + anticipatedText + '. ' +
+    'The ' + spendingLabel + ' monitoring boundary was applied' +
+    (settings.futilityEnabled ? ' with ' + (settings.futilityBinding ? 'binding' : 'non-binding') + ' futility boundaries' : '') +
+    '. ' +
+    'The required information size was ' + result.risAdj.toLocaleString() + ' participants ' +
+    '(adjusted for diversity D\u00B2 = ' + result.d2.toFixed(2) + '). ' +
+    'After ' + result.cumulative.length + ' studies including ' +
+    finalCum.N_cum.toLocaleString() + ' participants ' +
+    '(' + pctRIS + '% of RIS), ' +
+    'the cumulative Z-curve ' + crossText +
+    ' the monitoring boundary' + directionText + '. ' +
+    'The TSA-adjusted 95% confidence interval was ' + ciLower + ' to ' + ciUpper + '. ' +
+    'Heterogeneity was ' + (result.i2 * 100).toFixed(1) + '% (I\u00B2), ' +
+    '\u03C4\u00B2 = ' + result.tau2.toFixed(4) + '.';
+
+  return text;
+}
+
+// ---- Update report when switching to Tab 4 ----
+document.getElementById('tab-report').addEventListener('click', function() {
+  if (lastTSAResult) {
+    document.getElementById('reportText').textContent = generateReportText(lastTSAResult, lastSettings);
+  }
+});
+
+// ---- Copy Report ----
+document.getElementById('btnCopyReport').addEventListener('click', function() {
+  var text = document.getElementById('reportText').textContent;
+  if (!text || text.indexOf('Run TSA') === 0) {
+    showToast('No report to copy. Run TSA first.');
+    return;
+  }
+  navigator.clipboard.writeText(text).then(function() {
+    showToast('Report text copied to clipboard');
+  }).catch(function() {
+    // Fallback for older browsers
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('Report text copied to clipboard');
+  });
+});
+
+// ---- Download PNG ----
+document.getElementById('btnDownloadPNG').addEventListener('click', function() {
+  if (!lastTSAResult) {
+    showToast('Run TSA first');
+    return;
+  }
+
+  var canvas = document.getElementById('tsaCanvas');
+  var dataURL = canvas.toDataURL('image/png');
+  var a = document.createElement('a');
+  a.href = dataURL;
+  a.download = 'tsa-diagram.png';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  showToast('PNG downloaded');
+});
+
+// ---- Download CSV ----
+document.getElementById('btnDownloadCSV').addEventListener('click', function() {
+  if (!lastTSAResult) {
+    showToast('Run TSA first');
+    return;
+  }
+
+  var result = lastTSAResult;
+  var lines = ['Look,Study,N_cumulative,Information_Fraction,Z_observed,Z_boundary_upper,Z_boundary_lower,Z_futility'];
+
+  result.cumulative.forEach(function(c, i) {
+    var boundary = result.boundaries[i] ? result.boundaries[i].z.toFixed(4) : '';
+    var futility = (result.futility && result.futility[i]) ? result.futility[i].z.toFixed(4) : '';
+    lines.push([
+      c.k,
+      '"' + (c.name ?? '').replace(/"/g, '""') + '"',
+      c.N_cum,
+      c.IF.toFixed(4),
+      c.z.toFixed(4),
+      boundary,
+      boundary ? ('-' + boundary) : '',
+      futility
+    ].join(','));
+  });
+
+  var csv = lines.join('\n');
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'tsa-boundaries.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url); // Revoke Blob URL after use
+  showToast('CSV downloaded');
+});
+
+// ---- Download JSON ----
+document.getElementById('btnDownloadJSON').addEventListener('click', function() {
+  if (!lastTSAResult) {
+    showToast('Run TSA first');
+    return;
+  }
+
+  var exportData = {
+    app: 'TSA Pro',
+    version: '1.0.0',
+    date: new Date().toISOString(),
+    settings: lastSettings,
+    ris: lastTSAResult.ris,
+    risAdjusted: lastTSAResult.risAdj,
+    d2: lastTSAResult.d2,
+    i2: lastTSAResult.i2,
+    tau2: lastTSAResult.tau2,
+    verdict: lastTSAResult.verdict,
+    verdictDetail: lastTSAResult.verdictDetail,
+    crossedAtLook: lastTSAResult.crossedAtLook,
+    adjustedCI: lastTSAResult.adjustedCI,
+    conditionalPower: lastTSAResult.conditionalPower,
+    boundaries: lastTSAResult.boundaries,
+    futility: lastTSAResult.futility,
+    zCurve: lastTSAResult.zCurve,
+    cumulative: lastTSAResult.cumulative
+  };
+
+  var json = JSON.stringify(exportData, null, 2);
+  var blob = new Blob([json], { type: 'application/json;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'tsa-results.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url); // Revoke Blob URL after use
+  showToast('JSON downloaded');
+});
+
+// ---- Theme change: redraw charts ----
+document.getElementById('themeToggle').addEventListener('click', function() {
+  // Small delay to let the theme CSS apply
+  setTimeout(function() {
+    if (lastTSAResult) {
+      drawTSADiagram(document.getElementById('tsaCanvas'), lastTSAResult);
+      drawCumulativeForest(document.getElementById('forestCanvas'), lastTSAResult, { measure: lastSettings.measure });
+    }
+  }, 50);
+});
+
+// ---- Measure dropdown sync with outcome type ----
+document.querySelectorAll('input[name="outcomeType"]').forEach(function(radio) {
+  radio.addEventListener('change', function() {
+    var measureSelect = document.getElementById('settingMeasure');
+    var isBinary = this.value === 'binary';
+    // Set sensible default
+    if (isBinary) {
+      measureSelect.value = 'RR';
+    } else {
+      measureSelect.value = 'MD';
+    }
+    // Trigger change event to update visibility
+    measureSelect.dispatchEvent(new Event('change'));
+  });
+});
 
 // === INIT ===
 console.log('TSA Pro loaded successfully');
