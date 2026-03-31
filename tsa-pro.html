@@ -1005,7 +1005,235 @@ function betaSpending(t, type, beta) {
 }
 
 // === BOUNDARY ENGINE ===
-// (Task 3 adds boundary computation here)
+
+/**
+ * Compute monitoring boundaries using recursive numerical integration.
+ * Armitage-McPherson-Rowe algorithm with M grid points.
+ *
+ * @param {number[]} infoFractions - array of information fractions (ascending, last = IF_K)
+ * @param {string} spendingType - spending function type
+ * @param {number} alpha - overall alpha level (two-sided)
+ * @param {number} [M=500] - number of grid points for integration
+ * @returns {object[]} array of {t, z, alphaSpent} at each look
+ */
+function computeBoundaries(infoFractions, spendingType, alpha, M) {
+  M = M ?? 500;
+  const K = infoFractions.length;
+  if (K === 0) return [];
+
+  const results = [];
+  const twoSided = true; // always two-sided in TSA Pro
+
+  // For two-sided test, work with alpha/2 for each tail
+  const halfAlpha = alpha / 2;
+
+  // Cumulative alpha spent at each look (one-tail)
+  const cumulativeSpent = [];
+  for (let k = 0; k < K; k++) {
+    cumulativeSpent.push(alphaSpending(infoFractions[k], spendingType, alpha) / 2);
+  }
+
+  // Incremental alpha at each look
+  const incrementalAlpha = [];
+  for (let k = 0; k < K; k++) {
+    incrementalAlpha.push(k === 0 ? cumulativeSpent[0] : cumulativeSpent[k] - cumulativeSpent[k - 1]);
+  }
+
+  // Grid for numerical integration
+  // We maintain a discrete density over the grid from look to look
+  const gridMin = -8;
+  const gridMax = 8;
+  const dz = (gridMax - gridMin) / M;
+
+  // Grid points (midpoints of intervals)
+  const gridZ = [];
+  for (let i = 0; i < M; i++) {
+    gridZ.push(gridMin + (i + 0.5) * dz);
+  }
+
+  // Standard normal PDF
+  function normalPDF(x) {
+    return Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI);
+  }
+
+  // At look 1: standard normal density, find z1 from incremental alpha
+  // P(Z > z1) = incrementalAlpha[0]
+  // For first look, boundary is simply the quantile
+  let z1 = normalQuantile(1 - incrementalAlpha[0]);
+  results.push({
+    t: infoFractions[0],
+    z: z1,
+    alphaSpent: cumulativeSpent[0] * 2 // two-sided total
+  });
+
+  if (K === 1) return results;
+
+  // Initialize density on grid: standard normal truncated to [-z1, z1]
+  let density = new Float64Array(M);
+  for (let i = 0; i < M; i++) {
+    if (gridZ[i] > -z1 && gridZ[i] < z1) {
+      density[i] = normalPDF(gridZ[i]) * dz;
+    }
+  }
+
+  // Recursive computation for looks 2..K
+  for (let k = 1; k < K; k++) {
+    const tPrev = infoFractions[k - 1];
+    const tCurr = infoFractions[k];
+
+    // Correlation between looks: rho = sqrt(t_{k-1} / t_k)
+    const rho = Math.sqrt(tPrev / tCurr);
+    const sdCond = Math.sqrt(1 - rho * rho); // conditional SD
+
+    // Propagate density forward: Z_k | Z_{k-1} = z ~ N(rho*z, 1-rho^2)
+    const newDensity = new Float64Array(M);
+    for (let j = 0; j < M; j++) {
+      // New grid point
+      const zNew = gridZ[j];
+      let sum = 0;
+      for (let i = 0; i < M; i++) {
+        if (density[i] <= 0) continue;
+        // Conditional mean: rho * gridZ[i]
+        const condMean = rho * gridZ[i];
+        const condZ = (zNew - condMean) / sdCond;
+        sum += density[i] * normalPDF(condZ) / sdCond * dz;
+      }
+      newDensity[j] = sum;
+    }
+
+    // Find z_k: the critical value such that P(|Z_k| > z_k AND not crossed before) = incrementalAlpha[k]
+    // Bisection search over z_k
+    let lo = 0;
+    let hi = 8;
+    for (let iter = 0; iter < 100; iter++) {
+      const mid = (lo + hi) / 2;
+      // Probability of crossing at this look: sum of density beyond +-mid
+      let crossProb = 0;
+      for (let j = 0; j < M; j++) {
+        if (gridZ[j] > mid || gridZ[j] < -mid) {
+          crossProb += newDensity[j];
+        }
+      }
+      if (crossProb > incrementalAlpha[k]) {
+        lo = mid; // boundary too small, increase
+      } else {
+        hi = mid; // boundary too large, decrease
+      }
+    }
+    const zk = (lo + hi) / 2;
+    results.push({
+      t: infoFractions[k],
+      z: zk,
+      alphaSpent: cumulativeSpent[k] * 2
+    });
+
+    // Truncate density for next iteration (remove parts beyond boundary)
+    density = new Float64Array(M);
+    for (let j = 0; j < M; j++) {
+      if (gridZ[j] > -zk && gridZ[j] < zk) {
+        density[j] = newDensity[j];
+      }
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Compute futility boundaries using beta-spending.
+ *
+ * @param {number[]} infoFractions - array of information fractions
+ * @param {string} spendingType - spending function type
+ * @param {number} beta - overall beta (type II error = 1 - power)
+ * @param {boolean} binding - true for binding futility, false for non-binding
+ * @param {number} [M=500] - grid points
+ * @returns {object[]} array of {t, z} at each look (inner futility bounds)
+ */
+function computeFutilityBoundaries(infoFractions, spendingType, beta, binding, M) {
+  M = M ?? 500;
+  const K = infoFractions.length;
+  if (K === 0) return [];
+
+  const results = [];
+
+  // Cumulative beta spent at each look
+  const cumulativeSpent = [];
+  for (let k = 0; k < K; k++) {
+    cumulativeSpent.push(betaSpending(infoFractions[k], spendingType, beta));
+  }
+
+  // Incremental beta
+  const incrementalBeta = [];
+  for (let k = 0; k < K; k++) {
+    incrementalBeta.push(k === 0 ? cumulativeSpent[0] : cumulativeSpent[k] - cumulativeSpent[k - 1]);
+  }
+
+  // Grid setup
+  const gridMin = -8;
+  const gridMax = 8;
+  const dz = (gridMax - gridMin) / M;
+  const gridZ = [];
+  for (let i = 0; i < M; i++) {
+    gridZ.push(gridMin + (i + 0.5) * dz);
+  }
+
+  function normalPDF(x) {
+    return Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI);
+  }
+
+  // Under H1 (true effect = drift), the Z-statistics follow N(drift_k, 1)
+  // where drift_k = theta * sqrt(I_k) and at full information drift = z_alpha/2 + z_beta
+  // For simplicity in the beta-spending framework, we compute boundaries under H0
+  // and then the futility bound is the inner region where we would accept H0.
+
+  // Non-binding futility: simple approach using quantiles of beta spending
+  // Binding requires adjusting the efficacy boundary -- more complex
+
+  // Simplified futility computation:
+  // At each look k, the futility boundary is the z-value below which
+  // we stop for futility. Using the quantile approach:
+  // P(Z_k < f_k | H0, not yet stopped) = incrementalBeta[k]
+  // Under H0, this is equivalent to finding f_k from the beta spending function
+
+  if (!binding) {
+    // Non-binding: futility boundaries are informational only
+    // Use the standard quantile approach under the alternative
+    // At look k, futility boundary ~ normalQuantile(cumulativeSpent[k])
+    // This produces inner boundaries that get wider as information accumulates
+    for (let k = 0; k < K; k++) {
+      const betaCum = cumulativeSpent[k];
+      // Under H1 with drift, the futility boundary is placed so that
+      // the probability of crossing it (falsely accepting H0) = betaCum
+      // Simplified: place boundary as a function of the beta spending
+      // For O'Brien-Fleming beta spending, early boundaries are very negative (lenient)
+      // For Pocock, they are more uniform
+      const fk = normalQuantile(1 - betaCum);
+      // Futility: inner boundary (we stop if |Z| < fk when fk > 0 is the inner boundary)
+      // Convention: futility boundary is the z-value BELOW which we stop
+      // In two-sided TSA, futility means Z is close to 0
+      // Typical: f_k is positive and decreasing toward 0
+
+      results.push({
+        t: infoFractions[k],
+        z: Math.max(fk, 0) // futility bound is always >= 0 (inner)
+      });
+    }
+  } else {
+    // Binding: more complex -- the futility boundary is part of the decision rule
+    // and affects the efficacy boundary computation.
+    // For now, use the same approach but mark as binding
+    for (let k = 0; k < K; k++) {
+      const betaCum = cumulativeSpent[k];
+      const fk = normalQuantile(1 - betaCum);
+      results.push({
+        t: infoFractions[k],
+        z: Math.max(fk, 0)
+      });
+    }
+  }
+
+  return results;
+}
 
 // === META-ANALYSIS ENGINE ===
 // (Task 4 adds pooling functions here)
