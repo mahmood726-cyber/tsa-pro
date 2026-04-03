@@ -685,7 +685,7 @@ textarea {
 <!-- ============================================================
      TAB PANELS
      ============================================================ -->
-<section class="tab-panel active" id="panel-data" role="tabpanel" aria-labelledby="tab-data">
+<section class="tab-panel active" id="panel-data" role="tabpanel" aria-labelledby="tab-data" tabindex="-1">
 
   <!-- Outcome Type -->
   <div class="card">
@@ -709,17 +709,17 @@ textarea {
 
       <div style="margin-left:auto;">
         <div class="dropdown-wrap">
-          <button class="btn btn-ghost btn-sm" id="btnLoadExample" aria-label="Load example dataset">Load Example &#9662;</button>
-          <div class="dropdown-menu" id="exampleDropdown">
-            <button class="dropdown-item" data-example="0">
+          <button class="btn btn-ghost btn-sm" id="btnLoadExample" aria-label="Load example dataset" aria-haspopup="true" aria-expanded="false">Load Example &#9662;</button>
+          <div class="dropdown-menu" id="exampleDropdown" role="menu">
+            <button class="dropdown-item" role="menuitem" data-example="0">
               Aprotinin for Bleeding
               <span class="dropdown-item-sub">Cochrane CD004338 -- 15 RCTs, binary (RR). Boundary crossed early.</span>
             </button>
-            <button class="dropdown-item" data-example="1">
+            <button class="dropdown-item" role="menuitem" data-example="1">
               Therapeutic Hypothermia
               <span class="dropdown-item-sub">Cochrane CD003311 -- 11 RCTs, binary (RR). Crossed near RIS.</span>
             </button>
-            <button class="dropdown-item" data-example="2">
+            <button class="dropdown-item" role="menuitem" data-example="2">
               IV Magnesium for MI
               <span class="dropdown-item-sub">Teo/ISIS-4 -- 16 RCTs, binary (OR). Never crosses boundary.</span>
             </button>
@@ -759,7 +759,7 @@ textarea {
 
 </section>
 
-<section class="tab-panel" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings">
+<section class="tab-panel" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" tabindex="-1">
 
   <div class="settings-grid">
 
@@ -881,7 +881,7 @@ textarea {
 
 </section>
 
-<section class="tab-panel" id="panel-results" role="tabpanel" aria-labelledby="tab-results">
+<section class="tab-panel" id="panel-results" role="tabpanel" aria-labelledby="tab-results" tabindex="-1">
 
   <!-- Verdict Box -->
   <div class="verdict-box inconclusive" id="verdictBox">
@@ -899,14 +899,14 @@ textarea {
       <div class="canvas-wrap">
         <canvas id="tsaCanvas" width="1200" height="700"
                 aria-label="Trial Sequential Analysis monitoring diagram showing Z-curve and boundaries"
-                role="img"></canvas>
+                role="img">Your browser does not support HTML5 canvas. The TSA monitoring diagram would appear here.</canvas>
       </div>
 
       <!-- Cumulative Forest Plot -->
       <div class="canvas-wrap">
         <canvas id="forestCanvas" width="1200" height="600"
                 aria-label="Cumulative forest plot showing pooled effect at each sequential look"
-                role="img"></canvas>
+                role="img">Your browser does not support HTML5 canvas. The cumulative forest plot would appear here.</canvas>
       </div>
     </div>
 
@@ -964,7 +964,7 @@ textarea {
 
 </section>
 
-<section class="tab-panel" id="panel-report" role="tabpanel" aria-labelledby="tab-report">
+<section class="tab-panel" id="panel-report" role="tabpanel" aria-labelledby="tab-report" tabindex="-1">
 
   <div class="card">
     <div class="card-title">Auto-Generated Report Text</div>
@@ -1174,6 +1174,13 @@ var EXAMPLE_MAGNESIUM = {
 var EXAMPLES = [EXAMPLE_APROTININ, EXAMPLE_HYPOTHERMIA, EXAMPLE_MAGNESIUM];
 
 // === MATH ENGINE ===
+
+/**
+ * Standard normal PDF.
+ */
+function normalPDF(x) {
+  return Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI);
+}
 
 /**
  * Normal CDF - Abramowitz & Stegun 26.2.17
@@ -1432,11 +1439,6 @@ function computeBoundaries(infoFractions, spendingType, alpha, M) {
     gridZ.push(gridMin + (i + 0.5) * dz);
   }
 
-  // Standard normal PDF
-  function normalPDF(x) {
-    return Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI);
-  }
-
   // At look 1: standard normal density, find z1 from incremental alpha
   // P(Z > z1) = incrementalAlpha[0]
   // For first look, boundary is simply the quantile
@@ -1556,10 +1558,6 @@ function computeFutilityBoundaries(infoFractions, spendingType, beta, binding, M
   const gridZ = [];
   for (let i = 0; i < M; i++) {
     gridZ.push(gridMin + (i + 0.5) * dz);
-  }
-
-  function normalPDF(x) {
-    return Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI);
   }
 
   // Under H1 (true effect = drift), the Z-statistics follow N(drift_k, 1)
@@ -2675,11 +2673,25 @@ document.getElementById('btnClearAll').addEventListener('click', function() {
 
   btn.addEventListener('click', function(e) {
     e.stopPropagation();
-    menu.classList.toggle('open');
+    var isOpen = menu.classList.toggle('open');
+    btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    if (isOpen) {
+      var first = menu.querySelector('.dropdown-item');
+      if (first) first.focus();
+    }
   });
 
   document.addEventListener('click', function() {
     menu.classList.remove('open');
+    btn.setAttribute('aria-expanded', 'false');
+  });
+
+  menu.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      menu.classList.remove('open');
+      btn.setAttribute('aria-expanded', 'false');
+      btn.focus();
+    }
   });
 
   menu.querySelectorAll('.dropdown-item').forEach(function(item) {
@@ -2889,6 +2901,9 @@ document.getElementById('btnRunTSA').addEventListener('click', function() {
     return;
   }
 
+  // Auto-sort by year (ascending) for correct cumulative ordering
+  studies.sort(function(a, b) { return (a.year || 0) - (b.year || 0); });
+
   var settings = readSettings();
   lastSettings = settings;
 
@@ -2929,18 +2944,18 @@ document.getElementById('btnRunTSA').addEventListener('click', function() {
   verdictText.textContent = result.verdictDetail;
   verdictSR.textContent = 'TSA Verdict: ' + result.verdict + '. ' + result.verdictDetail;
 
-  // Update RIS panel
+  // Update RIS panel (guard NaN values)
   var finalCum = result.cumulative[result.cumulative.length - 1];
-  document.getElementById('risValue').textContent = result.ris.toLocaleString();
-  document.getElementById('risAdjValue').textContent = result.risAdj.toLocaleString();
-  document.getElementById('risCurrentValue').textContent = finalCum.N_cum.toLocaleString();
+  document.getElementById('risValue').textContent = isFinite(result.ris) ? result.ris.toLocaleString() : '--';
+  document.getElementById('risAdjValue').textContent = isFinite(result.risAdj) ? result.risAdj.toLocaleString() : '--';
+  document.getElementById('risCurrentValue').textContent = isFinite(finalCum.N_cum) ? finalCum.N_cum.toLocaleString() : '--';
   var pctRIS = (finalCum.N_cum / result.risAdj * 100);
-  document.getElementById('risPercent').textContent = pctRIS.toFixed(1) + '%';
+  document.getElementById('risPercent').textContent = isFinite(pctRIS) ? pctRIS.toFixed(1) + '%' : '--';
   var remaining = Math.max(0, result.risAdj - finalCum.N_cum);
-  document.getElementById('risRemaining').textContent = remaining > 0 ? remaining.toLocaleString() : 'Reached';
-  document.getElementById('risD2').textContent = result.d2.toFixed(3);
-  document.getElementById('risI2').textContent = (result.i2 * 100).toFixed(1) + '%';
-  document.getElementById('risTau2').textContent = result.tau2.toFixed(4);
+  document.getElementById('risRemaining').textContent = isFinite(remaining) ? (remaining > 0 ? remaining.toLocaleString() : 'Reached') : '--';
+  document.getElementById('risD2').textContent = isFinite(result.d2) ? result.d2.toFixed(3) : '--';
+  document.getElementById('risI2').textContent = isFinite(result.i2) ? (result.i2 * 100).toFixed(1) + '%' : '--';
+  document.getElementById('risTau2').textContent = isFinite(result.tau2) ? result.tau2.toFixed(4) : '--';
   document.getElementById('risLooks').textContent = result.cumulative.length;
   document.getElementById('risCondPower').textContent = (result.conditionalPower * 100).toFixed(1) + '%';
 

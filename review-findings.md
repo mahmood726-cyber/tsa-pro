@@ -1,7 +1,7 @@
-# REVIEW CLEAN — All P0 and P1 Fixed
+# REVIEW CLEAN — All P0, P1, and P2 Fixed
 ## Multi-Persona Review: tsa-pro.html (3,182 lines)
-### Date: 2026-03-31
-### Summary: 3P0 FIXED, 10P1 FIXED, 5P2 remaining. 49/49 tests pass. Div balance: 69/69.
+### Date: 2026-03-31 (P2 pass: 2026-04-03)
+### Summary: 3P0 FIXED, 10P1 FIXED, 7P2 FIXED. 49/49 tests pass. Div balance: 69/69.
 
 ---
 
@@ -26,14 +26,14 @@
 - **P1-1** [ACK]: REML score uses approximate formulation (missing cross-term) — converges correctly in practice; Fisher info matches approximation
 - **P1-4** [ACK]: Conditional power uses boundary at last look — acceptable approximation; exact requires extrapolating boundaries beyond observed IFs
 
-### P2 — Minor (remaining)
+### P2 — Minor (all fixed)
 - **P2-1** [FIXED]: SMD variance used `2*(nE+nC)` — corrected to `2*df` where df=nE+nC-2
-- **P2-3** normalPDF defined twice in nested scopes (DRY, not a bug)
-- **P2-4** Tab panels lack `tabindex="-1"` for focus management
-- **P2-5** Dropdown lacks `role="menu"`/`role="menuitem"` and Escape key
-- **P2-6** Canvas elements have no fallback text
-- **P2-7** NaN inputs propagate silently to RIS display
-- **P2-8** Studies not auto-sorted by year before cumulative MA
+- **P2-3** [FIXED]: normalPDF extracted to top-level shared function (was duplicated in two nested scopes)
+- **P2-4** [FIXED]: Tab panels now have `tabindex="-1"` for focus management
+- **P2-5** [FIXED]: Dropdown has `role="menu"`/`role="menuitem"`, `aria-haspopup`/`aria-expanded`, and Escape key closes menu
+- **P2-6** [FIXED]: Canvas elements have fallback text for non-canvas browsers
+- **P2-7** [FIXED]: All RIS panel values guarded with `isFinite()` check; displays '--' for NaN
+- **P2-8** [FIXED]: Studies auto-sorted by year (ascending) before cumulative MA
 
 ### Confirmed Correct
 - Alpha-spending O'Brien-Fleming formula
