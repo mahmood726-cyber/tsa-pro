@@ -650,6 +650,7 @@ textarea {
 </style>
 </head>
 <body>
+<a href="#panel-data" class="sr-only" style="position:absolute;left:-9999px;top:auto;z-index:999" onfocus="this.style.cssText='position:fixed;left:0;top:0;z-index:999;padding:8px 16px;background:var(--accent);color:#fff;font-family:var(--font-sans);text-decoration:none;font-size:.9rem;border-radius:0 0 4px 0'" onblur="this.style.cssText='position:absolute;left:-9999px;top:auto;z-index:999'">Skip to content</a>
 
 <!-- ============================================================
      HEADER
@@ -1274,30 +1275,37 @@ function sampleSizeRIS(params) {
   if (params.type === 'binary') {
     const pC = params.controlRate;
     const effect = params.anticipatedEffect;
+    if (effect == null || pC == null) return Infinity;
 
     if (params.measure === 'RD') {
-      // Risk Difference
-      const pE = pC + effect;
-      // Pooled variance approach
+      // Risk Difference: total N = 4 * zSum^2 * pBar*(1-pBar) / delta^2
+      const pE = Math.max(0.001, Math.min(0.999, pC + effect));
       const pBar = (pC + pE) / 2;
+      if (effect === 0) return Infinity;
       return Math.ceil(4 * zSum * zSum * pBar * (1 - pBar) / (effect * effect));
     } else if (params.measure === 'RR') {
-      // Relative Risk (log scale)
-      const logRR = Math.log(Math.abs(effect));
-      if (logRR === 0) return Infinity;
-      return Math.ceil(4 * zSum * zSum / (logRR * logRR));
+      // Relative Risk: total N using variance of log(RR) with control rate
+      if (effect <= 0 || effect === 1) return Infinity;
+      const logRR = Math.log(effect);
+      const pE = Math.max(0.001, Math.min(0.999, pC * effect));
+      // Var(log RR) per arm ~ (1-pE)/(m*pE) + (1-pC)/(m*pC), total N = 2m
+      const varPerArm = (1 - pE) / pE + (1 - pC) / pC;
+      return Math.ceil(2 * zSum * zSum * varPerArm / (logRR * logRR));
     } else {
-      // OR (log scale)
-      const logOR = Math.log(Math.abs(effect));
-      if (logOR === 0) return Infinity;
-      return Math.ceil(4 * zSum * zSum / (logOR * logOR));
+      // OR: total N using Woolf variance with control rate
+      if (effect <= 0 || effect === 1) return Infinity;
+      const logOR = Math.log(effect);
+      const pE = Math.max(0.001, Math.min(0.999, (pC * effect) / (1 - pC + pC * effect)));
+      // Var(log OR) per arm ~ 1/(m*pE*(1-pE)) + 1/(m*pC*(1-pC)), total N = 2m
+      const varPerArm = 1 / (pE * (1 - pE)) + 1 / (pC * (1 - pC));
+      return Math.ceil(2 * zSum * zSum * varPerArm / (logOR * logOR));
     }
   } else {
-    // Continuous: MD or SMD
+    // Continuous: MD or SMD. Total N = 4 * zSum^2 * sigma^2 / delta^2
     const delta = params.anticipatedEffect;
     const sigma = params.sigma ?? 1;
     if (delta === 0) return Infinity;
-    return Math.ceil(2 * zSum * zSum * sigma * sigma / (delta * delta));
+    return Math.ceil(4 * zSum * zSum * sigma * sigma / (delta * delta));
   }
 }
 
@@ -1361,7 +1369,8 @@ function betaSpending(t, type, beta) {
   if (t >= 1) return beta;
   beta = beta ?? 0.20;
 
-  const zBetaHalf = normalQuantile(1 - beta / 2);
+  // Futility uses one-sided beta (not beta/2) — power is directional
+  const zBetaHalf = normalQuantile(1 - beta);
 
   switch (type) {
     case 'obrien-fleming':
@@ -1661,7 +1670,9 @@ function computeRD(eE, nE, eC, nC) {
   const pE = eE / nE;
   const pC = eC / nC;
   const yi = pE - pC;
-  const vi = pE * (1 - pE) / nE + pC * (1 - pC) / nC;
+  let vi = pE * (1 - pE) / nE + pC * (1 - pC) / nC;
+  // Guard against zero variance (double-zero or all-events cells)
+  if (vi <= 0) vi = 1 / (2 * nE) + 1 / (2 * nC);
   return { yi: yi, vi: vi };
 }
 
@@ -1697,8 +1708,8 @@ function computeSMD(mE, sdE, nE, mC, sdC, nC) {
   const J = 1 - 3 / (4 * df - 1);
   const g = d * J;
 
-  // Variance of g
-  const vi = (nE + nC) / (nE * nC) + (g * g) / (2 * (nE + nC));
+  // Variance of g (Hedges & Olkin, using df = nE+nC-2)
+  const vi = (nE + nC) / (nE * nC) + (g * g) / (2 * df);
   return { yi: g, vi: vi };
 }
 
@@ -1804,7 +1815,7 @@ function poolREML(yi, vi) {
   // The Math.max(1, qHKSJ) ensures HKSJ never narrows the CI vs standard
 
   // I^2
-  const I2 = Math.max(0, Math.min(1, (Q - (k - 1)) / Math.max(Q, 1)));
+  const I2 = Q > 0 ? Math.max(0, (Q - (k - 1)) / Q) : 0;
 
   // Use t-distribution critical value for HKSJ (df = k-1)
   // Approximate t critical value using normal for now (conservative enough for k>=5)
@@ -1834,6 +1845,7 @@ function poolREML(yi, vi) {
   return {
     estimate: estimate,
     se: seHKSJ,
+    seStandard: seStandard,
     tau2: tau2,
     I2: I2,
     ci_lower: ci_lower,
@@ -1971,6 +1983,16 @@ function computeTSA(studies, settings) {
     power: power
   };
   var ris = sampleSizeRIS(risParams);
+  if (!isFinite(ris) || ris <= 0) {
+    return {
+      cumulative: cumulative, boundaries: [], futility: null,
+      ris: Infinity, risAdj: Infinity, d2: d2, i2: i2, tau2: tau2,
+      verdict: 'INCONCLUSIVE',
+      verdictDetail: 'Required information size could not be computed. The anticipated effect may be at or near the null value. Please specify a clinically meaningful anticipated effect in Settings.',
+      crossedAtLook: null, adjustedCI: { lower: 0, upper: 0 },
+      conditionalPower: 0, zCurve: []
+    };
+  }
   var risAdj = Math.ceil(ris * (1 + d2));
 
   // Step 4: Compute information fractions
@@ -2062,10 +2084,12 @@ function computeTSA(studies, settings) {
   }
 
   // Step 9: TSA-adjusted confidence interval at final look
+  // Use standard (non-HKSJ) SE to avoid double-penalization with TSA boundary z
   var finalBoundary = boundaries[boundaries.length - 1];
+  var seForCI = finalPool.seStandard ?? finalPool.se;
   var adjustedCI = {
-    lower: finalPool.estimate - (finalBoundary ? finalBoundary.z : 1.96) * finalPool.se,
-    upper: finalPool.estimate + (finalBoundary ? finalBoundary.z : 1.96) * finalPool.se
+    lower: finalPool.estimate - (finalBoundary ? finalBoundary.z : 1.96) * seForCI,
+    upper: finalPool.estimate + (finalBoundary ? finalBoundary.z : 1.96) * seForCI
   };
 
   // Step 10: Conditional power estimate
@@ -2839,8 +2863,8 @@ function readSettings() {
   return {
     measure: document.getElementById('settingMeasure').value,
     type: currentOutcomeType,
-    alpha: parseFloat(document.getElementById('settingAlpha').value) || 0.05,
-    power: parseFloat(document.getElementById('settingPower').value) || 0.80,
+    alpha: (function(v) { var p = parseFloat(v); return isFinite(p) && p > 0 ? p : 0.05; })(document.getElementById('settingAlpha').value),
+    power: (function(v) { var p = parseFloat(v); return isFinite(p) && p > 0 ? p : 0.80; })(document.getElementById('settingPower').value),
     anticipatedEffect: anticipatedRaw !== '' ? parseFloat(anticipatedRaw) : null,
     controlRate: controlRateRaw !== '' ? parseFloat(controlRateRaw) : null,
     sigma: sigmaRaw !== '' ? parseFloat(sigmaRaw) : null,
