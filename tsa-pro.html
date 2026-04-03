@@ -1369,8 +1369,9 @@ function betaSpending(t, type, beta) {
   if (t >= 1) return beta;
   beta = beta ?? 0.20;
 
-  // Futility uses one-sided beta (not beta/2) — power is directional
-  const zBetaHalf = normalQuantile(1 - beta);
+  // Use beta/2 so the spending function converges to beta as t->1:
+  // 2 - 2*Phi(z_{beta/2}) = 2 - 2*(1 - beta/2) = beta
+  const zBetaHalf = normalQuantile(1 - beta / 2);
 
   switch (type) {
     case 'obrien-fleming':
